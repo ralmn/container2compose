@@ -149,10 +149,11 @@ func CreateContainer(dockerCli docker.APIClient, containerData types.ContainerJS
 		volumes = append(volumes, fmt.Sprintf("%s:%s%s", mount.Source, mount.Destination, rw))
 	}
 
-	for port, portBind := range containerData.NetworkSettings.Ports {
+	for port, portBind := range containerData.HostConfig.PortBindings {
 		for _, bind := range portBind {
 			hostIp := ""
-			if bind.HostIP != "0.0.0.0" {
+
+			if bind.HostIP != "" && bind.HostIP != "0.0.0.0" {
 				hostIp = fmt.Sprintf("%s:", bind.HostIP)
 			}
 			portStr := fmt.Sprintf("%s%s:%s", hostIp, bind.HostPort, port.Port())
