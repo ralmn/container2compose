@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"reflect"
 	"path"
+	"strings"
 )
 
 type Container struct {
@@ -19,9 +20,12 @@ type Container struct {
 	Volumes  []string `yaml:"volumes,omitempty"`
 	Ports    []string `yaml:"ports,omitempty"`
 	Commands []string `yaml:"commands,omitempty"`
+	Links []string `yaml:"links,omitempty"`
+	ExternalLinks []string `yaml:"external_links,omitempty"`
 }
 
 var output string
+var containersInside map[string]string
 
 func main() {
 
@@ -44,14 +48,28 @@ func main() {
 	toWrite["version"] = "3.6"
 
 
+	dockerCli, err := docker.NewEnvClient()
+	if err != nil {
+		logrus.Error("Failed to connect on docker daemon")
+		panic(err)
+	}
+
+	containersInside = make(map[string]string)
 
 	for _, containerId := range flag.Args() {
 
-		dockerCli, err := docker.NewEnvClient()
+		containerData, err := dockerCli.ContainerInspect(context.Background(), containerId)
 		if err != nil {
-			logrus.Error("Failed to connect on docker daemon")
-			panic(err)
+			logrus.Errorf("Failed to inspect container '%s'.", containerId)
+			logrus.Error(err)
+			continue
 		}
+		containerName := path.Base(containerData.Name)
+		containersInside[containerName] = containerId
+
+	}
+
+	for containerName, containerId := range containersInside {
 
 		containerData, err := dockerCli.ContainerInspect(context.Background(), containerId)
 
@@ -60,8 +78,6 @@ func main() {
 			logrus.Error(err)
 			continue
 		}
-
-		containerName := path.Base(containerData.Name)
 
 		services[containerName] = CreateContainer(dockerCli, containerData)
 
@@ -86,8 +102,24 @@ func CreateContainer(dockerCli docker.APIClient, containerData types.ContainerJS
 	var volumes []string
 	var ports []string
 	var commands []string
+	var links []string
+	var externalLinks []string
 
 	commands = containerData.Config.Cmd
+
+	for _, link := range containerData.HostConfig.Links {
+		logrus.Infof("%s : %s", containerData.Name, link)
+		linkPart := strings.Split(link, ":")
+
+		baseContainer := path.Base(linkPart[0])
+		baseAlias := path.Base(linkPart[1])
+
+		if containersInside[baseContainer] != "" {
+			links = append(links, fmt.Sprintf("%s:%s", baseContainer, baseAlias))
+		}else{
+			externalLinks = append(externalLinks, fmt.Sprintf("%s:%s", baseContainer, baseAlias))
+		}
+	}
 
 	if imageData, _, err := dockerCli.ImageInspectWithRaw(context.Background(), containerData.Image); err == nil {
 		tags := imageData.RepoTags
@@ -123,6 +155,8 @@ func CreateContainer(dockerCli docker.APIClient, containerData types.ContainerJS
 		Volumes:  volumes,
 		Ports:    ports,
 		Commands: commands,
+		Links: links,
+		ExternalLinks: externalLinks,
 	}
 
 }
