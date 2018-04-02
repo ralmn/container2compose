@@ -40,8 +40,10 @@ func main() {
 	}
 
 	toWrite := make(map[string]interface{})
+	services := make(map[string]interface{})
+	toWrite["version"] = "3.6"
 
-	toWrite["version"] = "3"
+
 
 	for _, containerId := range flag.Args() {
 
@@ -61,11 +63,13 @@ func main() {
 
 		containerName := path.Base(containerData.Name)
 
-		toWrite[containerName] = CreateContainer(dockerCli, containerData)
+		services[containerName] = CreateContainer(dockerCli, containerData)
 
 	}
 
-	logrus.Infof("res : %+v", toWrite)
+	toWrite["services"] = services
+
+	logrus.Debugf("res : %+v", toWrite)
 
 	if data, err := yaml.Marshal(&toWrite); err == nil {
 		ioutil.WriteFile(output, data, 0644)
@@ -107,7 +111,7 @@ func CreateContainer(dockerCli docker.APIClient, containerData types.ContainerJS
 		for _, bind := range portBind {
 			hostIp := ""
 			if bind.HostIP != "0.0.0.0" {
-				hostIp = bind.HostIP
+				hostIp = fmt.Sprintf("%s:", bind.HostIP)
 			}
 			portStr := fmt.Sprintf("%s%s:%s", hostIp, bind.HostPort, port.Port())
 			ports = append(ports, portStr)
