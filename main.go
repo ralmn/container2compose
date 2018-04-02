@@ -22,6 +22,7 @@ type Container struct {
 	Commands []string `yaml:"commands,omitempty"`
 	Links []string `yaml:"links,omitempty"`
 	ExternalLinks []string `yaml:"external_links,omitempty"`
+	Environments []string `yaml:"environment,omitempty"`
 }
 
 var output string
@@ -104,11 +105,11 @@ func CreateContainer(dockerCli docker.APIClient, containerData types.ContainerJS
 	var commands []string
 	var links []string
 	var externalLinks []string
+	var environments []string
 
 	commands = containerData.Config.Cmd
 
 	for _, link := range containerData.HostConfig.Links {
-		logrus.Infof("%s : %s", containerData.Name, link)
 		linkPart := strings.Split(link, ":")
 
 		baseContainer := path.Base(linkPart[0])
@@ -129,6 +130,15 @@ func CreateContainer(dockerCli docker.APIClient, containerData types.ContainerJS
 		if reflect.DeepEqual(imageData.Config.Cmd, containerData.Config.Cmd) {
 			commands = commands[:0]
 		}
+
+		for _, env := range containerData.Config.Env {
+			if !contains(imageData.Config.Env, env) {
+				environments = append(environments, env)
+			}
+		}
+
+	}else{
+		environments = containerData.Config.Env
 	}
 
 	for _, mount := range containerData.Mounts {
@@ -157,6 +167,16 @@ func CreateContainer(dockerCli docker.APIClient, containerData types.ContainerJS
 		Commands: commands,
 		Links: links,
 		ExternalLinks: externalLinks,
+		Environments: environments,
 	}
 
+}
+
+func contains(list []string, elementToFind string) bool {
+	for _, elementInList := range list {
+		if elementInList == elementToFind {
+			return true
+		}
+	}
+	return false
 }
