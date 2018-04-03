@@ -23,6 +23,7 @@ type Container struct {
 	Links []string `yaml:"links,omitempty"`
 	ExternalLinks []string `yaml:"external_links,omitempty"`
 	Environments []string `yaml:"environment,omitempty"`
+	RestartPolicy string `yaml:"restart,omitempty"`
 }
 
 var output string
@@ -161,6 +162,12 @@ func CreateContainer(dockerCli docker.APIClient, containerData types.ContainerJS
 		}
 	}
 
+	restartPolicy := ""
+
+	if !containerData.HostConfig.RestartPolicy.IsNone() {
+		restartPolicy = containerData.HostConfig.RestartPolicy.Name
+	}
+
 	return Container{
 		Image:    image,
 		Volumes:  volumes,
@@ -169,6 +176,7 @@ func CreateContainer(dockerCli docker.APIClient, containerData types.ContainerJS
 		Links: links,
 		ExternalLinks: externalLinks,
 		Environments: environments,
+		RestartPolicy: restartPolicy,
 	}
 
 }
